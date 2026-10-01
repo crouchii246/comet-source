@@ -1,3 +1,4 @@
+import socket
 from comet.core.logger import log_scraper_error
 from comet.core.models import settings
 from comet.scrapers.base import BaseScraper
@@ -42,6 +43,7 @@ class TorboxScraper(BaseScraper):
 
     async def scrape(self, request: ScrapeRequest):
         torrents = []
+        print("TORBOX DNS TEST:", socket.getaddrinfo("search-api.torbox.app", 443))
 
         try:
             async with self.session.get(
