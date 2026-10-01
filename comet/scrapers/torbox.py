@@ -43,9 +43,9 @@ class TorboxScraper(BaseScraper):
 
     async def scrape(self, request: ScrapeRequest):
         torrents = []
-        print("TORBOX DNS TEST:", socket.getaddrinfo("search-api.torbox.app", 443))
 
         try:
+            print("TORBOX DNS TEST:", socket.getaddrinfo("search-api.torbox.app", 443))
             async with self.session.get(
                 f"https://search-api.torbox.app/torrents/imdb:{request.media_only_id}",
                 headers={"Authorization": f"Bearer {settings.TORBOX_API_KEY}"},
