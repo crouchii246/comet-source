@@ -27,8 +27,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 ARG TARGETPLATFORM
-RUN --mount=type=cache,target=/root/.cache/uv,id=s/uv-${TARGETPLATFORM},sharing=locked uv sync --frozen --no-install-project
-
+RUN uv sync --frozen --no-install-project
 FROM python:3.13-slim-trixie AS runtime
 
 LABEL name="Comet" \
