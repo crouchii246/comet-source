@@ -1,4 +1,3 @@
-import socket
 from comet.core.logger import log_scraper_error
 from comet.core.models import settings
 from comet.scrapers.base import BaseScraper
@@ -45,7 +44,6 @@ class TorboxScraper(BaseScraper):
         torrents = []
 
         try:
-            print("TORBOX DNS TEST:", socket.getaddrinfo("search-api.torbox.app", 443))
             async with self.session.get(
                 f"https://search-api.torbox.app/torrents/imdb:{request.media_only_id}",
                 headers={"Authorization": f"Bearer {settings.TORBOX_API_KEY}"},
