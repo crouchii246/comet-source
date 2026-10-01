@@ -7,20 +7,41 @@ from comet.scrapers.models import ScrapeRequest
 from comet.services.torrent_manager import extract_trackers_from_magnet
 
 
-PANTHER_TORBOX_PROXY_URL = os.getenv(
-    "PANTHER_TORBOX_PROXY_URL",
-    "https://yjjrokhbapsehorfgnfz.supabase.co/functions/v1/panther-torbox",
-).strip()
+def _clean_env_value(value: str) -> str:
+    value = value.strip()
 
-PANTHER_TORBOX_PROXY_SECRET = os.getenv(
-    "PANTHER_TORBOX_PROXY_SECRET",
-    "",
-).strip()
+    # Railway/Supabase dashboards sometimes get values pasted with
+    # surrounding quote characters. Treat "abc", 'abc' and abc identically.
+    if (
+        len(value) >= 2
+        and value[0] == value[-1]
+        and value[0] in ('"', "'")
+    ):
+        value = value[1:-1].strip()
 
-PANTHER_SUPABASE_API_KEY = os.getenv(
-    "PANTHER_SUPABASE_API_KEY",
-    "",
-).strip()
+    return value
+
+
+PANTHER_TORBOX_PROXY_URL = _clean_env_value(
+    os.getenv(
+        "PANTHER_TORBOX_PROXY_URL",
+        "https://yjjrokhbapsehorfgnfz.supabase.co/functions/v1/panther-torbox",
+    )
+)
+
+PANTHER_TORBOX_PROXY_SECRET = _clean_env_value(
+    os.getenv(
+        "PANTHER_TORBOX_PROXY_SECRET",
+        "",
+    )
+)
+
+PANTHER_SUPABASE_API_KEY = _clean_env_value(
+    os.getenv(
+        "PANTHER_SUPABASE_API_KEY",
+        "",
+    )
+)
 
 
 class TorboxScraper(BaseScraper):
