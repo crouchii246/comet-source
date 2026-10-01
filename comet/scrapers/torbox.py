@@ -1,3 +1,4 @@
+import json
 import os
 
 from comet.core.logger import log_scraper_error
@@ -55,23 +56,42 @@ class TorboxScraper(BaseScraper):
 
     async def scrape(self, request: ScrapeRequest):
         torrents = []
+        media_id = request.media_only_id
 
         try:
+            print(
+                f"[TorBox Proxy] starting search for {media_id}",
+                flush=True,
+            )
+
             if not PANTHER_TORBOX_PROXY_URL:
+                print(
+                    "[TorBox Proxy] ERROR: PANTHER_TORBOX_PROXY_URL is empty",
+                    flush=True,
+                )
                 raise RuntimeError(
                     "PANTHER_TORBOX_PROXY_URL is not configured"
                 )
 
             if not PANTHER_TORBOX_PROXY_SECRET:
+                print(
+                    "[TorBox Proxy] ERROR: PANTHER_TORBOX_PROXY_SECRET is missing/empty",
+                    flush=True,
+                )
                 raise RuntimeError(
                     "PANTHER_TORBOX_PROXY_SECRET is not configured"
                 )
+
+            print(
+                "[TorBox Proxy] proxy secret is present",
+                flush=True,
+            )
 
             async with self.session.post(
                 PANTHER_TORBOX_PROXY_URL,
                 json={
                     "action": "torbox_search",
-                    "media_id": request.media_only_id,
+                    "media_id": media_id,
                 },
                 headers={
                     "Accept": "application/json",
@@ -81,57 +101,113 @@ class TorboxScraper(BaseScraper):
             ) as response:
                 response_text = await response.text()
 
+                print(
+                    f"[TorBox Proxy] HTTP {response.status} for {media_id}",
+                    flush=True,
+                )
+
                 if response.status < 200 or response.status >= 300:
+                    safe_body = response_text[:500]
+
+                    print(
+                        f"[TorBox Proxy] ERROR BODY: {safe_body}",
+                        flush=True,
+                    )
+
                     raise RuntimeError(
                         "Panther TorBox proxy returned "
                         f"HTTP {response.status}: "
-                        f"{response_text[:500]}"
+                        f"{safe_body}"
                     )
 
                 try:
-                    payload = await response.json()
+                    payload = json.loads(response_text)
                 except Exception as exc:
+                    print(
+                        "[TorBox Proxy] ERROR: response was not valid JSON",
+                        flush=True,
+                    )
                     raise RuntimeError(
                         "Panther TorBox proxy returned invalid JSON"
                     ) from exc
 
             if not isinstance(payload, dict):
+                print(
+                    "[TorBox Proxy] ERROR: top-level payload is not an object",
+                    flush=True,
+                )
                 return []
 
             if payload.get("success") is not True:
                 error = payload.get("error")
+
+                print(
+                    f"[TorBox Proxy] ERROR: success=false; error={error}",
+                    flush=True,
+                )
+
                 raise RuntimeError(
                     str(error or "Panther TorBox proxy search failed")
                 )
 
-            # Supabase wraps TorBox's original response in `data`.
             torbox_response = payload.get("data")
 
             if not isinstance(torbox_response, dict):
+                print(
+                    "[TorBox Proxy] No TorBox response object in payload.data",
+                    flush=True,
+                )
                 return []
 
             torbox_data = torbox_response.get("data")
 
             if not isinstance(torbox_data, dict):
+                print(
+                    "[TorBox Proxy] No TorBox data object in payload.data.data",
+                    flush=True,
+                )
                 return []
 
             torrent_items = torbox_data.get("torrents")
 
             if not isinstance(torrent_items, list):
+                print(
+                    "[TorBox Proxy] No torrents array in TorBox response",
+                    flush=True,
+                )
                 return []
+
+            print(
+                f"[TorBox Proxy] TorBox returned {len(torrent_items)} raw torrents for {media_id}",
+                flush=True,
+            )
+
+            rejected = 0
 
             for torrent in torrent_items:
                 parsed = self._parse_torrent(torrent)
 
                 if parsed is not None:
                     torrents.append(parsed)
+                else:
+                    rejected += 1
+
+            print(
+                f"[TorBox Proxy] parsed={len(torrents)} rejected={rejected} for {media_id}",
+                flush=True,
+            )
 
         except Exception as e:
-            # Do not log the proxy secret or the TorBox API token.
+            print(
+                f"[TorBox Proxy] EXCEPTION for {media_id}: {type(e).__name__}: {e}",
+                flush=True,
+            )
+
+            # Do not log the proxy secret or TorBox API token.
             log_scraper_error(
                 "TorBox",
                 "panther-supabase-proxy",
-                request.media_only_id,
+                media_id,
                 e,
             )
 
