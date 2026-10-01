@@ -17,6 +17,11 @@ PANTHER_TORBOX_PROXY_SECRET = os.getenv(
     "",
 ).strip()
 
+PANTHER_SUPABASE_API_KEY = os.getenv(
+    "PANTHER_SUPABASE_API_KEY",
+    "",
+).strip()
+
 
 class TorboxScraper(BaseScraper):
     def __init__(self, manager, session):
@@ -65,27 +70,43 @@ class TorboxScraper(BaseScraper):
             )
 
             if not PANTHER_TORBOX_PROXY_URL:
-                print(
-                    "[TorBox Proxy] ERROR: PANTHER_TORBOX_PROXY_URL is empty",
-                    flush=True,
-                )
                 raise RuntimeError(
                     "PANTHER_TORBOX_PROXY_URL is not configured"
                 )
 
             if not PANTHER_TORBOX_PROXY_SECRET:
-                print(
-                    "[TorBox Proxy] ERROR: PANTHER_TORBOX_PROXY_SECRET is missing/empty",
-                    flush=True,
-                )
                 raise RuntimeError(
                     "PANTHER_TORBOX_PROXY_SECRET is not configured"
                 )
 
+            if not PANTHER_SUPABASE_API_KEY:
+                raise RuntimeError(
+                    "PANTHER_SUPABASE_API_KEY is not configured"
+                )
+
             print(
-                "[TorBox Proxy] proxy secret is present",
+                "[TorBox Proxy] proxy secret and Supabase API key are present",
                 flush=True,
             )
+
+            headers = {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-Panther-Comet-Secret": PANTHER_TORBOX_PROXY_SECRET,
+
+                # Supabase Edge Gateway authentication.
+                # Use the project's publishable/anon API key here,
+                # never the service-role/secret key.
+                "apikey": PANTHER_SUPABASE_API_KEY,
+            }
+
+            # Legacy anon keys are JWTs. Supplying them as Authorization as
+            # well keeps compatibility with projects where verify_jwt expects
+            # an Authorization header specifically.
+            if PANTHER_SUPABASE_API_KEY.startswith("eyJ"):
+                headers["Authorization"] = (
+                    f"Bearer {PANTHER_SUPABASE_API_KEY}"
+                )
 
             async with self.session.post(
                 PANTHER_TORBOX_PROXY_URL,
@@ -93,11 +114,7 @@ class TorboxScraper(BaseScraper):
                     "action": "torbox_search",
                     "media_id": media_id,
                 },
-                headers={
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                    "X-Panther-Comet-Secret": PANTHER_TORBOX_PROXY_SECRET,
-                },
+                headers=headers,
             ) as response:
                 response_text = await response.text()
 
@@ -123,10 +140,6 @@ class TorboxScraper(BaseScraper):
                 try:
                     payload = json.loads(response_text)
                 except Exception as exc:
-                    print(
-                        "[TorBox Proxy] ERROR: response was not valid JSON",
-                        flush=True,
-                    )
                     raise RuntimeError(
                         "Panther TorBox proxy returned invalid JSON"
                     ) from exc
@@ -203,7 +216,7 @@ class TorboxScraper(BaseScraper):
                 flush=True,
             )
 
-            # Do not log the proxy secret or TorBox API token.
+            # Never log either secret/API key.
             log_scraper_error(
                 "TorBox",
                 "panther-supabase-proxy",
