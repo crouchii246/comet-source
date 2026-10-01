@@ -113,6 +113,7 @@ class TorboxScraper(BaseScraper):
                 json={
                     "action": "torbox_search",
                     "media_id": media_id,
+                    "proxy_secret": PANTHER_TORBOX_PROXY_SECRET,
                 },
                 headers=headers,
             ) as response:
